@@ -1,0 +1,754 @@
+{
+  "name": "Process Email Applications (AI)",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "labelIds": [
+            "Label_2014451926547253441"
+          ],
+          "q": "has:attachment filename:(pdf OR docx OR doc)",
+          "readStatus": "unread"
+        },
+        "options": {
+          "dataPropertyAttachmentsPrefixName": "attachment_",
+          "downloadAttachments": true
+        }
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "53afe6ec-5153-4054-a21f-b505b3e8b246",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UMmDYEiDH7XyBgJe",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C09M57YB8TF",
+          "mode": "list",
+          "cachedResultName": "email-job-applications"
+        },
+        "messageType": "block",
+        "blocksUi": "={\n  \"blocks\": [\n    {\n      \"type\": \"section\",\n      \"text\": {\n        \"type\": \"mrkdwn\",\n        \"text\": \"*New Job Application Received!*\"\n      }\n    },\n    {\n      \"type\": \"section\",\n      \"fields\": [\n        {\n          \"type\": \"mrkdwn\",\n          \"text\": \"*Name:*\\n{{ $('Map AI analysis to JSON').item.json.name.toUpperCase() }}\"\n        },\n        {\n          \"type\": \"mrkdwn\",\n          \"text\": \"*Email:*\\n{{ $('Map AI analysis to JSON').item.json.email }}\"\n        },\n        {\n          \"type\": \"mrkdwn\",\n          \"text\": \"*Phone:*\\n{{ $('Map AI analysis to JSON').item.json.phone }}\"\n        },\n        {\n          \"type\": \"mrkdwn\",\n          \"text\": \"*Position Applied:*\\n{{ $('Map AI analysis to JSON').item.json.positionApplied }}\"\n        },\n        {\n          \"type\": \"mrkdwn\",\n          \"text\": \"*Current Role:*\\n{{ $('Map AI analysis to JSON').item.json.currentRole }}\"\n        },\n        {\n          \"type\": \"mrkdwn\",\n          \"text\": \"*Total Experience:*\\n{{ $('Map AI analysis to JSON').item.json.totalYearsExperience }} years\"\n        }\n      ]\n    },\n    {\n      \"type\": \"section\",\n      \"text\": {\n        \"type\": \"mrkdwn\",\n        \"text\": \"*Cover Letter Highlights:*\\n{{ $('Map AI analysis to JSON').item.json.coverLetterRemark }}\"\n      }\n    },\n    {\n      \"type\": \"section\",\n      \"text\": {\n        \"type\": \"mrkdwn\",\n        \"text\": \"*Resume:*\\n<{{ $('Upload resume file to Drive').item.json.webViewLink }}|Click to view resume>\"\n      }\n    },\n    {\n      \"type\": \"actions\",\n      \"elements\": [\n        {\n          \"type\": \"button\",\n          \"text\": {\n            \"type\": \"plain_text\",\n            \"text\": \"Shortlist\"\n          },\n          \"style\": \"primary\",\n          \"value\": \"shortlist\",\n          \"action_id\": \"shortlist_button\"\n        },\n        {\n          \"type\": \"button\",\n          \"text\": {\n            \"type\": \"plain_text\",\n            \"text\": \"Decline\"\n          },\n          \"style\": \"danger\",\n          \"value\": \"decline\",\n          \"action_id\": \"decline_button\"\n        }\n      ]\n    }\n  ]\n}\n",
+        "text": "New Job Application Received!",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        2144,
+        -96
+      ],
+      "id": "0461c853-4812-4721-bc7a-4d6e8c0dd9b7",
+      "name": "Send a message",
+      "webhookId": "171c05d9-1b6a-491f-bedd-d94b66642188",
+      "credentials": {
+        "slackApi": {
+          "id": "gdknk9omop2yXjgz",
+          "name": "Slack account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are an HR assistant AI. Analyze the following resume text and cover letter (email body). \n\nApplication Date:\n{{ $('Gmail Trigger').item.json.headers.date }}\n\nResume:\n{{ $json.parsedResumeText }}\n\nEmail Subject: \n{{ $('Gmail Trigger').item.json.headers.subject }}\n\nEmail Body / Cover Letter:\n{{ $('Gmail Trigger').item.json.text }}\n\nTasks:\n1. Extract key information from the resume:\n   - Full name\n   - Address\n   - Email\n   - Phone\n   - Current role (based on Work Experience)\n   - Skills (as a list, include proficiency if mentioned)\n   - Education (for each degree, include degree name, institution, startYear, endYear, remarks if any)\n   - Work experience (for each company, include role, startDate, endDate, totalYearsExperience, keypoints if mentioned)\n     - For totalYearsExperience, calculate as follows:\n       1. Compute duration of each job in months.\n       2. Sum all durations to get total months.\n       3. Convert months to years using 0.5-year increments:\n          - Count only full years until the leftover months reach 6.\n          - If leftover months >= 6, add 0.5 to total years.\n       4. For roles marked as current, calculate up to the Application Date.\n   - Position applied for (Prioritize checking the position on the Email Subject)\n\n2. Analyze the cover letter and create a \"coverLetterRemark\" highlighting:\n   - Motivation for applying\n   - Notable achievements or projects mentioned\n   - Standout qualities or personality traits\n   - Summarize the cover letter in 2-3 sentences, focusing on motivation and notable achievements. Avoid using collective pronouns.\n\n3. Return ONLY valid JSON in the following structure. Do NOT include any explanations outside of the JSON:\n\n{\n  \"name\": \"\",\n  \"address\": \"\",\n  \"email\": \"\",\n  \"phone\": number (allow 0 at the front),\n  \"currentRole\":\"\",\n  \"skills\": [],\n  \"education\": [\n    {\n      \"degree\": \"\",\n      \"institution\": \"\",\n      \"startYear\": \"\",\n      \"endYear\": \"\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"workExperience\": [\n    {\n      \"role\": \"\",\n      \"company\": \"\",\n      \"startDate\": \"\",\n      \"endDate\": \"\",\n      \"yearsExperience\": \"\",\n      \"keypoints\": []\n    }\n  ],\n  \"totalYearsExperience\": number,\n  \"positionApplied\": \"\",\n  \"coverLetterRemark\": \"\"\n}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1,
+      "position": [
+        896,
+        0
+      ],
+      "id": "65517b69-1426-4223-a0cc-2776a6d0fab5",
+      "name": "Analyze Resume with Gemini",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "b5OCfWWiJpszOHPO",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "attachment_0",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        448,
+        -96
+      ],
+      "id": "a324c8b4-0c54-47fc-ae32-51bf72d56a5d",
+      "name": "Parse PDF to text"
+    },
+    {
+      "parameters": {
+        "jsCode": "try {\n    let rawText = $input.first().json.content.parts[0].text;\n\n    rawText = rawText.replace(/^```json\\s*/, '').replace(/```$/, '').trim();\n\n    const parsed = JSON.parse(rawText);\n\n    return [\n        {\n            json: parsed\n        }\n    ];\n} catch (error) {\n    return [\n        {\n            json: {\n                error: \"Failed to parse AI output\",\n                details: error.message,\n                rawText: $input.first().json.content.parts[0].text\n            }\n        }\n    ];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1248,
+        0
+      ],
+      "id": "befa26f7-3ff7-4266-a30d-b2ce45185af5",
+      "name": "Map AI analysis to JSON"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1bFRpbhoFMsrQe-hda08UdeubVAUkHD_OIerhenPDgw0",
+          "mode": "list",
+          "cachedResultName": "Job Listings",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1bFRpbhoFMsrQe-hda08UdeubVAUkHD_OIerhenPDgw0/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1bFRpbhoFMsrQe-hda08UdeubVAUkHD_OIerhenPDgw0/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Position",
+              "lookupValue": "={{ $('Map AI analysis to JSON').item.json.positionApplied }}"
+            },
+            {
+              "lookupColumn": "Status",
+              "lookupValue": "Open"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1696,
+        0
+      ],
+      "id": "a5615e7e-7906-48c7-8bf3-f108c95f082d",
+      "name": "Check Applied Position Availability",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "lfIy4yCMvBJkUmFB",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a8e21d9c-62ce-4c51-8fe0-ddaff0ddb57f",
+              "leftValue": "={{ $json.row_number }}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1920,
+        0
+      ],
+      "id": "1c40105b-a33e-4924-aad2-7cfb126f0ede",
+      "name": "Position is available?"
+    },
+    {
+      "parameters": {
+        "resource": "thread",
+        "operation": "reply",
+        "threadId": "={{ $('Gmail Trigger').item.json.threadId }}",
+        "messageId": "={{ $('Gmail Trigger').item.json.id }}",
+        "message": "=Dear {{ $('Map AI analysis to JSON').item.json.name.toSentenceCase().split(\" \")[0] }},  \n\nThank you for applying for the {{ $('Map AI analysis to JSON').item.json.positionApplied }} role. \n\nUnfortunately, there is currently no vacancy for this position.  \n\nWe appreciate your interest and encourage you to apply again in the future.  \n\nBest regards, \nWeGot Company Hiring Team",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2144,
+        96
+      ],
+      "id": "22ac7694-0851-4a42-9b1b-5b0f1d48f248",
+      "name": "Send rejection email",
+      "webhookId": "eccd17fc-ac4c-478a-9221-28576651db77",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UMmDYEiDH7XyBgJe",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "={{$('Gmail Trigger').item.binary.attachment_0}}",
+        "name": "=resume_{{ $json.name }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1Qb7RhYv0eFUU5Yu3zFrHr3Z8lLG49kbE",
+          "mode": "list",
+          "cachedResultName": "Job Applications",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1Qb7RhYv0eFUU5Yu3zFrHr3Z8lLG49kbE"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1472,
+        0
+      ],
+      "id": "c5123531-2132-4d7c-866c-eac21edf3614",
+      "name": "Upload resume file to Drive",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "yJhCbaFetZ0UrOUV",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ae3611ca-6406-4a05-8bf8-dab7d0306c28",
+              "leftValue": "={{$('Gmail Trigger').item.binary.attachment_0.fileExtension}}",
+              "rightValue": "pdf",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "a8ba14da-23bc-483a-99ce-607200178eff",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "binaryPropertyName": "={{ $('Gmail Trigger').item.binary.attachment_0 }}",
+        "additionalOptions": {}
+      },
+      "type": "n8n-nodes-readdoc.readDoc",
+      "typeVersion": 1,
+      "position": [
+        448,
+        96
+      ],
+      "id": "ee8cb455-fe45-4efb-9aad-3d9956a5ef66",
+      "name": "Read Doc"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7da13e67-31d9-430e-a151-128cd85afab4",
+              "name": "parsedResumeText",
+              "value": "={{ \n  $if($(\"Read Doc\").isExecuted, $(\"Read Doc\").item.json.content, \"\") \n  || $if($(\"Parse PDF to text\").isExecuted, $(\"Parse PDF to text\").item.json.text, \"\") \n}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        672,
+        0
+      ],
+      "id": "0e84df5b-4740-4559-8208-c2c377675444",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1ahhtkBtzXbyd0IPhj4kgLfNqULKcTQowO0WPbw6Iwtc",
+          "mode": "list",
+          "cachedResultName": "Job Application Tracker",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ahhtkBtzXbyd0IPhj4kgLfNqULKcTQowO0WPbw6Iwtc/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ahhtkBtzXbyd0IPhj4kgLfNqULKcTQowO0WPbw6Iwtc/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $json.message.ts }}",
+            "Name": "={{ $('Map AI analysis to JSON').item.json.name }}",
+            "Address": "={{ $('Map AI analysis to JSON').item.json.address }}",
+            "Phone": "={{ $('Map AI analysis to JSON').item.json.phone }}",
+            "Current Role": "={{ $('Map AI analysis to JSON').item.json.currentRole }}",
+            "Email": "={{ $('Map AI analysis to JSON').item.json.email }}",
+            "Degree": "={{ \n  Array.isArray($('Map AI analysis to JSON').item.json.education) \n    ? $('Map AI analysis to JSON').item.json.education.map(e => e.degree).filter(Boolean).join(', ') \n    : '' \n}}",
+            "Position Applied": "={{ $('Map AI analysis to JSON').item.json.positionApplied }}",
+            "Total Experience (Years)": "={{ $('Map AI analysis to JSON').item.json.totalYearsExperience }}",
+            "Skills": "={{ $('Map AI analysis to JSON').item.json.skills }}",
+            "Status": "Pending",
+            "AI Remarks": "={{ $('Map AI analysis to JSON').item.json.coverLetterRemark }}",
+            "Resume Link": "={{ $('Upload resume file to Drive').item.json.webViewLink }}",
+            "Slack Message Link": "=https://wegot-company.slack.com/archives/{{ $json.channel }}/p{{ $json.message.ts.replace(\".\",\"\") }}",
+            "Application ID": "={{ $('Gmail Trigger').item.json.id }}"
+          },
+          "matchingColumns": [
+            "Application ID"
+          ],
+          "schema": [
+            {
+              "id": "Application ID",
+              "displayName": "Application ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Address",
+              "displayName": "Address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Current Role",
+              "displayName": "Current Role",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Degree",
+              "displayName": "Degree",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Position Applied",
+              "displayName": "Position Applied",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Total Experience (Years)",
+              "displayName": "Total Experience (Years)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Skills",
+              "displayName": "Skills",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "AI Remarks",
+              "displayName": "AI Remarks",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Resume Link",
+              "displayName": "Resume Link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Slack Message Link",
+              "displayName": "Slack Message Link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2368,
+        -96
+      ],
+      "id": "308308da-1b1e-477f-82a8-b74c4a42134f",
+      "name": "Update Job Application Tracking Sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "lfIy4yCMvBJkUmFB",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "markAsRead",
+        "messageId": "={{ $('Gmail Trigger').item.json.id }}"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2368,
+        96
+      ],
+      "id": "bb42d6c4-82d7-46d4-b982-5f74dbb00bbe",
+      "name": "Change \"Read\" status",
+      "webhookId": "8cd51eb3-4f65-4b17-be5c-f1fc7f9d4823",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UMmDYEiDH7XyBgJe",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "markAsRead",
+        "messageId": "={{ $('Gmail Trigger').item.json.id }}"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2592,
+        -96
+      ],
+      "id": "962f930c-8610-4e6c-87a1-2bbf2a0d6ce9",
+      "name": "Change \"Read\" Status",
+      "webhookId": "c719374c-5a4f-48b7-9cfa-c72fb2eac0f5",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UMmDYEiDH7XyBgJe",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Resume with Gemini": {
+      "main": [
+        [
+          {
+            "node": "Map AI analysis to JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse PDF to text": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map AI analysis to JSON": {
+      "main": [
+        [
+          {
+            "node": "Upload resume file to Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Applied Position Availability": {
+      "main": [
+        [
+          {
+            "node": "Position is available?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Position is available?": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send rejection email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload resume file to Drive": {
+      "main": [
+        [
+          {
+            "node": "Check Applied Position Availability",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Parse PDF to text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Read Doc",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Doc": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Analyze Resume with Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send rejection email": {
+      "main": [
+        [
+          {
+            "node": "Change \"Read\" status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Update Job Application Tracking Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Job Application Tracking Sheet": {
+      "main": [
+        [
+          {
+            "node": "Change \"Read\" Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Manila",
+    "callerPolicy": "workflowsFromSameOwner",
+    "executionTimeout": 60,
+    "availableInMCP": false
+  },
+  "versionId": "195e2584-793a-4743-97c1-e01294c3c71f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7aa07a7121be0dc8f53bc45a9bdca696759dbe53af7407b14e674e4d3376087c"
+  },
+  "id": "k4qFGLBJo93dScxG",
+  "tags": []
+}
