@@ -64,6 +64,14 @@ Once the system is running, new applications will automatically:
    - Slack notification is sent.
    - Tracking sheet is updated.
    - Shortlist/Decline actions are handled asynchronously.
+  
+### For local instance deployment
+1. Install Docker on your system (if you haven't already).
+2. Secure a copy of the `docker-compose.yaml` file from the administrator and place it in your desired working directory.
+3. Open your Command Prompt/Terminal.
+4. Inside the terminal/console, navigate to your desired n8n local working directory (the directory where you placed the `docker-compose.yaml` file.
+5. Execute the command `docker compose up -d`and wait for it to finish.
+6. Access the local instance by entering this link `http://localhost:5678/` in the browser.
 
 ---
 
